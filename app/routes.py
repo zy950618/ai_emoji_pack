@@ -1,6 +1,12 @@
-from fastapi import APIRouter, Body, Depends
+import os
+from pathlib import Path
+
+from fastapi import APIRouter, Body, Depends, HTTPException, Query
 from fastapi.responses import FileResponse, HTMLResponse
 
+from app.admin_contracts import admin_error, admin_ok
+from app.admin_services import AdminService
+from app.admin_store import AdminStore
 from app.admin_ui import V7_ADMIN_HTML
 from app.audit import 审计服务
 from app.analytics import 数据回流服务
@@ -78,10 +84,213 @@ def 创建路由(
     LOOP验收: LOOP验收服务,
 ) -> APIRouter:
     router = APIRouter()
+    admin_asset_root = Path(__file__).resolve().parents[1] / "data" / "generated_assets"
+    admin_state_path = Path(
+        os.environ.get(
+            "AI_EMOJI_ADMIN_STATE_PATH",
+            str(Path(__file__).resolve().parents[1] / "data" / "admin_state.json"),
+        )
+    )
+    admin_service = AdminService(AdminStore(admin_state_path))
+
+    @router.get("/admin-assets/{asset_path:path}", summary="读取后台真实本地缩略图")
+    def 读取后台真实本地缩略图(asset_path: str) -> FileResponse:
+        target = (admin_asset_root / asset_path).resolve()
+        if not target.is_file() or admin_asset_root.resolve() not in target.parents:
+            raise HTTPException(status_code=404, detail="asset not found")
+        return FileResponse(target, media_type="image/png", filename=target.name)
+
+    @router.get("/api/admin/issues", summary="loop3 admin issues")
+    def loop3_admin_issues(
+        q: str | None = None,
+        priority: str | None = None,
+        type: str | None = None,
+        platform: str | None = None,
+        status: str | None = None,
+        sort: str = "priority,updated_desc",
+    ) -> dict[str, object]:
+        data = admin_service.list_issues(
+            {"q": q, "priority": priority, "type": type, "platform": platform, "status": status},
+            sort,
+        )
+        return admin_ok(data, dev_mock=False)
+
+    @router.post("/api/admin/issues/{issue_id}/cancel", summary="loop3 cancel issue")
+    def loop3_cancel_issue(issue_id: str) -> dict[str, object]:
+        try:
+            return admin_ok(admin_service.set_issue_status(issue_id, "cancelled"), dev_mock=False)
+        except KeyError:
+            return admin_error(
+                code="issue_not_found",
+                message="Issue was not found.",
+                stage="issue_cancel",
+                recoverable=False,
+                actions=["refresh"],
+                dev_mock=False,
+            )
+
+    @router.post("/api/admin/issues/{issue_id}/requeue", summary="loop3 requeue issue")
+    def loop3_requeue_issue(issue_id: str) -> dict[str, object]:
+        try:
+            return admin_ok(admin_service.set_issue_status(issue_id, "queued"), dev_mock=False)
+        except KeyError:
+            return admin_error("issue_not_found", "Issue was not found.", "issue_requeue", False, ["refresh"])
+
+    @router.post("/api/admin/issues/{issue_id}/resolve", summary="loop3 resolve issue")
+    def loop3_resolve_issue(issue_id: str) -> dict[str, object]:
+        try:
+            return admin_ok(admin_service.set_issue_status(issue_id, "resolved"), dev_mock=False)
+        except KeyError:
+            return admin_error("issue_not_found", "Issue was not found.", "issue_resolve", False, ["refresh"])
+
+    @router.get("/api/admin/failures", summary="loop3 admin failures")
+    def loop3_admin_failures(
+        q: str | None = None,
+        stage: str | None = None,
+        platform: str | None = None,
+        status: str | None = None,
+        sort: str = "updated_desc",
+    ) -> dict[str, object]:
+        data = admin_service.list_failures({"q": q, "stage": stage, "platform": platform, "status": status}, sort)
+        return admin_ok(data, dev_mock=False)
+
+    @router.post("/api/admin/failures/{failure_id}/cancel", summary="loop3 cancel failure")
+    def loop3_cancel_failure(failure_id: str) -> dict[str, object]:
+        try:
+            return admin_ok(admin_service.set_failure_status(failure_id, "cancelled"), dev_mock=False)
+        except KeyError:
+            return admin_error("failure_not_found", "Failure task was not found.", "failure_cancel", False, ["refresh"])
+
+    @router.post("/api/admin/failures/{failure_id}/requeue", summary="loop3 requeue failure")
+    def loop3_requeue_failure(failure_id: str) -> dict[str, object]:
+        try:
+            return admin_ok(admin_service.set_failure_status(failure_id, "queued"), dev_mock=False)
+        except KeyError:
+            return admin_error("failure_not_found", "Failure task was not found.", "failure_requeue", False, ["refresh"])
+
+    @router.get("/api/admin/sticker-packs", summary="loop3 sticker pack adapter")
+    def loop3_sticker_packs(
+        q: str | None = None,
+        platform: str | None = None,
+        status: str | None = None,
+        type: str | None = None,
+        quality_min: int | None = None,
+        quality_max: int | None = None,
+        export_status: str | None = None,
+        risk: str | None = None,
+        page: int = 1,
+        page_size: int = 20,
+    ) -> dict[str, object]:
+        data = admin_service.list_sticker_packs(
+            {
+                "q": q,
+                "platform": platform,
+                "status": status,
+                "type": type,
+                "quality_min": quality_min,
+                "quality_max": quality_max,
+                "export_status": export_status,
+                "risk": risk,
+            },
+            page,
+            page_size,
+        )
+        return admin_ok(data, dev_mock=False)
+
+    @router.post("/api/admin/prompt/generate", summary="loop3 generate prompt")
+    def loop3_generate_prompt(payload: dict[str, object] = Body(default_factory=dict)) -> dict[str, object]:
+        data = admin_service.generate_prompt(
+            str(payload.get("theme", "")),
+            str(payload.get("style", "")),
+            str(payload.get("platform", "")),
+        )
+        return admin_ok(data, dev_mock=False)
+
+    @router.post("/api/admin/prompt/optimize", summary="loop3 optimize prompt")
+    def loop3_optimize_prompt(payload: dict[str, object] = Body(default_factory=dict)) -> dict[str, object]:
+        return admin_ok(admin_service.optimize_prompt(str(payload.get("prompt", ""))), dev_mock=False)
+
+    @router.post("/api/admin/prompt/optimize-remote", summary="loop3 remote prompt fallback")
+    def loop3_optimize_prompt_remote(payload: dict[str, object] = Body(default_factory=dict)) -> dict[str, object]:
+        return admin_ok(admin_service.optimize_prompt_remote(str(payload.get("prompt", ""))), dev_mock=False)
+
+    @router.get("/api/admin/prompt/history", summary="loop3 prompt history")
+    def loop3_prompt_history() -> dict[str, object]:
+        return admin_ok({"items": admin_service.prompt_history()}, dev_mock=False)
+
+    @router.get("/api/admin/exports", summary="loop3 export list")
+    def loop3_exports(page: int = 1, page_size: int = 4, status: str | None = None, platform: str | None = None) -> dict[str, object]:
+        return admin_ok(admin_service.list_exports(page, page_size, status, platform), dev_mock=False)
+
+    @router.post("/api/admin/exports/batch", summary="loop3 batch export")
+    def loop3_batch_export(payload: dict[str, object] = Body(default_factory=dict)) -> dict[str, object]:
+        ids = payload.get("ids") or []
+        if not isinstance(ids, list) or not ids:
+            return admin_error("empty_export_selection", "No export rows were selected.", "export_batch", True, ["select_rows"])
+        return admin_ok(admin_service.batch_export([str(item) for item in ids]), dev_mock=False)
+
+    @router.post("/api/admin/exports/{export_id}/run", summary="loop3 run export")
+    def loop3_run_export(export_id: str) -> dict[str, object]:
+        try:
+            return admin_ok(admin_service.run_export(export_id), dev_mock=False)
+        except KeyError:
+            return admin_error("export_not_found", "Export task was not found.", "export_run", False, ["refresh"])
+
+    @router.get("/api/admin/exports/{export_id}", summary="loop3 export detail")
+    def loop3_export_detail(export_id: str) -> dict[str, object]:
+        for row in admin_service.list_exports(1, 1000)["items"]:
+            if row["id"] == export_id:
+                return admin_ok(row, dev_mock=False)
+        return admin_error("export_not_found", "Export task was not found.", "export_detail", False, ["refresh"])
+
+    @router.get("/api/admin/settings/platform-rules", summary="loop3 platform rules")
+    def loop3_platform_rules() -> dict[str, object]:
+        rules = [
+            {
+                "platform": name,
+                "size": "512x512",
+                "formats": ["png", "webp", "zip"],
+                "max_file_size": "1MB",
+                "transparent_background": True,
+                "animated_rule": "within platform limits",
+                "naming_rule": "platform-index",
+                "validation_enabled": True,
+            }
+            for name in ["WeChat", "Telegram", "LINE", "WhatsApp"]
+        ]
+        return admin_ok({"items": rules}, dev_mock=True)
+
+    @router.put("/api/admin/settings/platform-rules/{platform}", summary="loop3 save platform rule")
+    def loop3_save_platform_rule(platform: str, payload: dict[str, object] = Body(default_factory=dict)) -> dict[str, object]:
+        return admin_ok({"platform": platform, "payload": payload}, dev_mock=True)
+
+    @router.get("/api/admin/settings/generation-sources", summary="loop3 generation sources")
+    def loop3_generation_sources() -> dict[str, object]:
+        data = {
+            "local_prompt_generator": True,
+            "remote_prompt_optimizer_url": "",
+            "enabled": False,
+            "timeout_ms": 1200,
+            "fallback_strategy": "local",
+            "last_call_status": "fallback_ready",
+        }
+        return admin_ok(data, dev_mock=True)
+
+    @router.put("/api/admin/settings/generation-sources", summary="loop3 save generation sources")
+    def loop3_save_generation_sources(payload: dict[str, object] = Body(default_factory=dict)) -> dict[str, object]:
+        return admin_ok({"payload": payload}, dev_mock=True)
+
+    @router.post("/api/admin/settings/generation-sources/test", summary="loop3 test generation source")
+    def loop3_test_generation_source() -> dict[str, object]:
+        return admin_ok({"remote": "unavailable", "fallback": "local"}, dev_mock=True)
 
     @router.get("/health", response_model=标准响应, summary="健康检查")
     def 健康检查() -> 标准响应:
         return 标准响应(成功=True, 消息="后台可启动", 数据={"服务状态": "正常"})
+
+    @router.get("/", response_class=HTMLResponse, summary="Owner 后台首页")
+    def Owner后台首页() -> HTMLResponse:
+        return HTMLResponse(V7_ADMIN_HTML)
 
     @router.get("/admin", response_class=HTMLResponse, summary="运营管理后台")
     def 运营管理后台() -> HTMLResponse:
@@ -553,6 +762,38 @@ def 创建路由(
         要求角色(当前操作人, {"管理员", "运营", "审核员"})
         return 标准响应(成功=True, 消息="标签库已返回", 数据=标签库())
 
+    @router.post("/v1/设计元素/动作", response_model=标准响应, summary="生成动作设计元素")
+    def 生成动作设计元素(当前操作人: 操作人 = Depends(获取操作人)) -> 标准响应:
+        要求角色(当前操作人, {"管理员", "运营"})
+        elements = ["点头确认", "摇头拒绝", "跳跃庆祝", "摊手无奈", "打工崩溃", "催办提醒"]
+        审计.记录(当前操作人.编号, "生成动作元素", "设计元素", "动作元素", {"元素数量": len(elements)})
+        return 标准响应(
+            成功=True,
+            消息="动作元素已生成",
+            数据={
+                "元素类型": "动作",
+                "推荐元素": elements,
+                "应用建议": "用于套装动作差异化，优先覆盖确认、拒绝、庆祝、无奈等高频聊天场景。",
+                "下一步": "进入套装编辑器后选择单张表情应用动作元素。",
+            },
+        )
+
+    @router.post("/v1/设计元素/视觉", response_model=标准响应, summary="生成视觉设计元素")
+    def 生成视觉设计元素(当前操作人: 操作人 = Depends(获取操作人)) -> 标准响应:
+        要求角色(当前操作人, {"管理员", "运营"})
+        elements = ["主色板", "描边规则", "纸质纹理", "速度线", "字体风格", "阴影层级"]
+        审计.记录(当前操作人.编号, "生成视觉元素", "设计元素", "视觉元素", {"元素数量": len(elements)})
+        return 标准响应(
+            成功=True,
+            消息="视觉元素已生成",
+            数据={
+                "元素类型": "视觉",
+                "推荐元素": elements,
+                "应用建议": "用于统一套装视觉语言，优先约束色板、描边、字体和贴纸质感。",
+                "下一步": "进入套装编辑器后将视觉元素应用到当前套装。",
+            },
+        )
+
     @router.post("/v1/受众画像", response_model=标准响应, summary="创建受众画像")
     def 创建受众画像接口(请求: 创建受众画像请求, 当前操作人: 操作人 = Depends(获取操作人)) -> 标准响应:
         要求角色(当前操作人, {"管理员", "运营"})
@@ -631,9 +872,19 @@ def 创建路由(
         return FileResponse(asset["文件路径"], media_type="image/png", filename=f"{item_id}.png")
 
     @router.get("/v1/下载中心/套装", response_model=标准响应, summary="查询下载中心套装")
-    def 查询下载中心套装接口(当前操作人: 操作人 = Depends(获取操作人)) -> 标准响应:
+    def 查询下载中心套装接口(
+        平台: str | None = Query(default=None, alias="platform"),
+        受众: str | None = Query(default=None, alias="audience"),
+        状态: str | None = Query(default=None, alias="status"),
+        风格标签: list[str] | None = Query(default=None, alias="style"),
+        当前操作人: 操作人 = Depends(获取操作人),
+    ) -> 标准响应:
         要求角色(当前操作人, {"管理员", "运营", "审核员"})
-        return 标准响应(成功=True, 消息="下载中心套装已返回", 数据=平台包.套装列表())
+        return 标准响应(
+            成功=True,
+            消息="下载中心套装已返回",
+            数据=平台包.套装列表(目标平台=平台, 目标受众=受众, 状态=状态, 风格标签=风格标签),
+        )
 
     @router.post("/v1/下载中心/套装/{set_id}/下载前检查", response_model=标准响应, summary="执行套装下载前检查")
     def 套装下载前检查接口(
