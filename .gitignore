@@ -3,5 +3,21 @@ __pycache__/
 .pytest_cache/
 .coverage
 htmlcov/
+logs
+tests
 data/*.sqlite
 logs/*.log
+
+# Local IDE state
+.idea/
+
+# Local acceptance/runtime evidence. Keep final archive reports tracked.
+.ci-out/*
+!.ci-out/final_acceptance_summary.md
+!.ci-out/maintenance_backlog.md
+!.ci-out/release_notes.md
+
+# Generated local artifacts
+artifacts/
+data/admin_state.json
+data/preview_packages/

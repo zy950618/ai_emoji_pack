@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" href="data:,">
+  <title>表情包工坊 Pro</title>
+  <link rel="stylesheet" href="/admin-static/admin.css">
+</head>
+<body data-theme="aurora">
+  <div id="app" class="app-shell preview-derived-shell">
+    <aside class="sidebar" data-testid="preview-derived-sidebar">
+      <div class="brand">
+        <div class="brand-mark">犬</div>
+        <div>
+          <div class="brand-title">表情包工坊</div>
+          <div class="brand-sub">生成、质检与发布闭环</div>
+        </div>
+      </div>
+      <nav id="nav" class="nav" aria-label="主导航">
+        <button id="nav-overview" data-route="overview" data-testid="nav-overview"><span class="nav-icon">◎</span><span>总览</span></button>
+        <button id="nav-generation" data-route="generation" data-testid="nav-generation"><span class="nav-icon">✦</span><span>生成工作台</span></button>
+        <button id="nav-library" data-route="library" data-testid="nav-library"><span class="nav-icon">▣</span><span>表情包库</span></button>
+        <button id="nav-assets" data-route="assets" data-testid="nav-assets"><span class="nav-icon">◆</span><span>设计资产</span></button>
+        <button id="nav-qa" data-route="qa" data-testid="nav-qa"><span class="nav-icon">✓</span><span>质检审核</span></button>
+        <button id="nav-export" data-route="export" data-testid="nav-export"><span class="nav-icon">↥</span><span>发布导出</span></button>
+        <button id="nav-analytics" data-route="analytics" data-testid="nav-analytics"><span class="nav-icon">⌁</span><span>数据表现</span></button>
+        <button id="nav-settings" data-route="settings" data-testid="nav-settings"><span class="nav-icon">⚙</span><span>系统设置</span></button>
+      </nav>
+      <div class="owner-card">
+        <div class="owner-avatar">管</div>
+        <div class="owner-meta">
+          <strong>管理员</strong>
+          <span>本地后台运行中</span>
+        </div>
+        <button class="icon-button" type="button" title="收起侧栏">‹</button>
+      </div>
+    </aside>
+
+    <main class="main" data-testid="preview-derived-main">
+      <header class="topbar">
+        <div class="page-heading">
+          <h1 id="pageTitle">总览</h1>
+          <p id="pageSubtitle">今天的生成、质检、导出和平台风险</p>
+        </div>
+        <div class="topbar-actions" data-testid="topbar-actions">
+          <label class="search-box">
+            <span>⌕</span>
+            <input id="globalSearch" data-testid="global-search" placeholder="搜索表情包、任务、平台、失败原因">
+          </label>
+          <select id="themeSelect" class="theme-select" data-testid="theme-select" title="主题切换">
+            <option value="aurora">极光蓝</option>
+            <option value="graphite">石墨灰</option>
+            <option value="sakura">樱花粉</option>
+            <option value="forest">森林绿</option>
+          </select>
+          <button id="dateRange" class="ghost-button" type="button">2026-07-01 · 今天</button>
+          <button id="refreshBtn" class="ghost-button" data-testid="refresh-button" type="button" onclick="refreshAll()">刷新</button>
+          <button id="newTaskBtn" class="primary-button" data-testid="new-generation" type="button" onclick="newGeneration()">新建生成</button>
+        </div>
+      </header>
+      <section id="content" class="content" data-testid="admin-content"></section>
+    </main>
+  </div>
+
+  <div id="drawer" class="drawer" data-testid="detail-drawer" aria-hidden="true"></div>
+  <div id="modal" class="modal-layer" aria-hidden="true"></div>
+  <div id="toast" class="toast-stack" data-testid="toast"></div>
+
+  <meta name="admin-ui-source" content="preview/index.html + preview/styles.css + API-backed admin.js">
+  <script src="/admin-static/admin.js"></script>
+</body>
+</html>

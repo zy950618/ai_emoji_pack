@@ -7,7 +7,7 @@ from fastapi.responses import FileResponse, HTMLResponse
 from app.admin_contracts import admin_error, admin_ok
 from app.admin_services import AdminService
 from app.admin_store import AdminStore
-from app.admin_ui import V7_ADMIN_HTML
+from app.admin_ui import ADMIN_STATIC_DIR, load_admin_html
 from app.audit import 审计服务
 from app.analytics import 数据回流服务
 from app.asset_validator import 资产校验服务
@@ -98,7 +98,15 @@ def 创建路由(
         target = (admin_asset_root / asset_path).resolve()
         if not target.is_file() or admin_asset_root.resolve() not in target.parents:
             raise HTTPException(status_code=404, detail="asset not found")
-        return FileResponse(target, media_type="image/png", filename=target.name)
+        media_type = "image/gif" if target.suffix.lower() == ".gif" else "image/png"
+        return FileResponse(target, media_type=media_type, filename=target.name)
+
+    @router.get("/admin-static/{asset_path:path}", summary="读取 preview-derived 后台静态资源")
+    def 读取后台静态资源(asset_path: str) -> FileResponse:
+        target = (ADMIN_STATIC_DIR / asset_path).resolve()
+        if not target.is_file() or ADMIN_STATIC_DIR.resolve() not in target.parents:
+            raise HTTPException(status_code=404, detail="static asset not found")
+        return FileResponse(target, filename=target.name)
 
     @router.get("/api/admin/issues", summary="loop3 admin issues")
     def loop3_admin_issues(
@@ -107,11 +115,15 @@ def 创建路由(
         type: str | None = None,
         platform: str | None = None,
         status: str | None = None,
+        page: int = 1,
+        page_size: int = 20,
         sort: str = "priority,updated_desc",
     ) -> dict[str, object]:
         data = admin_service.list_issues(
             {"q": q, "priority": priority, "type": type, "platform": platform, "status": status},
             sort,
+            page,
+            page_size,
         )
         return admin_ok(data, dev_mock=False)
 
@@ -134,14 +146,28 @@ def 创建路由(
         try:
             return admin_ok(admin_service.set_issue_status(issue_id, "queued"), dev_mock=False)
         except KeyError:
-            return admin_error("issue_not_found", "Issue was not found.", "issue_requeue", False, ["refresh"])
+            return admin_error(
+                code="issue_not_found",
+                message="Issue was not found.",
+                stage="issue_requeue",
+                recoverable=False,
+                actions=["refresh"],
+                dev_mock=False,
+            )
 
     @router.post("/api/admin/issues/{issue_id}/resolve", summary="loop3 resolve issue")
     def loop3_resolve_issue(issue_id: str) -> dict[str, object]:
         try:
             return admin_ok(admin_service.set_issue_status(issue_id, "resolved"), dev_mock=False)
         except KeyError:
-            return admin_error("issue_not_found", "Issue was not found.", "issue_resolve", False, ["refresh"])
+            return admin_error(
+                code="issue_not_found",
+                message="Issue was not found.",
+                stage="issue_resolve",
+                recoverable=False,
+                actions=["refresh"],
+                dev_mock=False,
+            )
 
     @router.get("/api/admin/failures", summary="loop3 admin failures")
     def loop3_admin_failures(
@@ -149,9 +175,11 @@ def 创建路由(
         stage: str | None = None,
         platform: str | None = None,
         status: str | None = None,
+        page: int = 1,
+        page_size: int = 20,
         sort: str = "updated_desc",
     ) -> dict[str, object]:
-        data = admin_service.list_failures({"q": q, "stage": stage, "platform": platform, "status": status}, sort)
+        data = admin_service.list_failures({"q": q, "stage": stage, "platform": platform, "status": status}, sort, page, page_size)
         return admin_ok(data, dev_mock=False)
 
     @router.post("/api/admin/failures/{failure_id}/cancel", summary="loop3 cancel failure")
@@ -159,14 +187,77 @@ def 创建路由(
         try:
             return admin_ok(admin_service.set_failure_status(failure_id, "cancelled"), dev_mock=False)
         except KeyError:
-            return admin_error("failure_not_found", "Failure task was not found.", "failure_cancel", False, ["refresh"])
+            return admin_error(
+                code="failure_not_found",
+                message="Failure task was not found.",
+                stage="failure_cancel",
+                recoverable=False,
+                actions=["refresh"],
+                dev_mock=False,
+            )
 
     @router.post("/api/admin/failures/{failure_id}/requeue", summary="loop3 requeue failure")
     def loop3_requeue_failure(failure_id: str) -> dict[str, object]:
         try:
             return admin_ok(admin_service.set_failure_status(failure_id, "queued"), dev_mock=False)
         except KeyError:
-            return admin_error("failure_not_found", "Failure task was not found.", "failure_requeue", False, ["refresh"])
+            return admin_error(
+                code="failure_not_found",
+                message="Failure task was not found.",
+                stage="failure_requeue",
+                recoverable=False,
+                actions=["refresh"],
+                dev_mock=False,
+            )
+
+    @router.get("/api/admin/assets", summary="loop5.1 design assets")
+    def loop5_1_assets(type: str | None = None, page: int = 1, page_size: int = 20) -> dict[str, object]:
+        return admin_ok(admin_service.list_assets({"type": type}, page, page_size), dev_mock=False)
+
+    @router.get("/api/admin/qa", summary="loop5.1 qa items")
+    def loop5_1_qa(page: int = 1, page_size: int = 20) -> dict[str, object]:
+        return admin_ok(admin_service.list_qa_items(page, page_size), dev_mock=False)
+
+    @router.get("/api/admin/qa-items", summary="loop5.2 qa items alias")
+    def loop5_2_qa_items(page: int = 1, page_size: int = 20) -> dict[str, object]:
+        return admin_ok(admin_service.list_qa_items(page, page_size), dev_mock=False)
+
+    @router.post("/api/admin/qa/{item_id}/approve", summary="loop5.1 approve single qa item")
+    def loop5_1_qa_approve(item_id: str) -> dict[str, object]:
+        try:
+            return admin_ok(admin_service.approve_qa(item_id), dev_mock=False)
+        except KeyError:
+            return admin_error(
+                code="qa_item_not_found",
+                message="QA item was not found.",
+                stage="qa_approve",
+                recoverable=False,
+                actions=["refresh"],
+                dev_mock=False,
+            )
+
+    @router.post("/api/admin/qa/{item_id}/reject", summary="loop5.1 reject single qa item")
+    def loop5_1_qa_reject(item_id: str, payload: dict[str, object] = Body(default_factory=dict)) -> dict[str, object]:
+        try:
+            return admin_ok(admin_service.reject_qa(item_id, str(payload.get("reason", ""))), dev_mock=False)
+        except ValueError:
+            return admin_error(
+                code="reject_reason_required",
+                message="Reject reason is required.",
+                stage="qa_reject",
+                recoverable=True,
+                actions=["fill_reason"],
+                dev_mock=False,
+            )
+        except KeyError:
+            return admin_error(
+                code="qa_item_not_found",
+                message="QA item was not found.",
+                stage="qa_reject",
+                recoverable=False,
+                actions=["refresh"],
+                dev_mock=False,
+            )
 
     @router.get("/api/admin/sticker-packs", summary="loop3 sticker pack adapter")
     def loop3_sticker_packs(
@@ -178,6 +269,7 @@ def 创建路由(
         quality_max: int | None = None,
         export_status: str | None = None,
         risk: str | None = None,
+        dynamic: str | None = None,
         page: int = 1,
         page_size: int = 20,
     ) -> dict[str, object]:
@@ -191,11 +283,48 @@ def 创建路由(
                 "quality_max": quality_max,
                 "export_status": export_status,
                 "risk": risk,
+                "dynamic": dynamic,
             },
             page,
             page_size,
         )
         return admin_ok(data, dev_mock=False)
+
+    @router.delete("/api/admin/stickers/{sticker_id}", summary="loop5.4 soft delete sticker")
+    def loop5_4_delete_sticker(sticker_id: str) -> dict[str, object]:
+        try:
+            return admin_ok(admin_service.delete_sticker(sticker_id), dev_mock=False)
+        except KeyError:
+            return admin_error(code="sticker_not_found", message="Sticker was not found.", stage="sticker_delete", recoverable=False, actions=["refresh"], dev_mock=False)
+
+    @router.delete("/api/admin/sticker-packs/{pack_id}", summary="loop5.4 soft delete sticker pack")
+    def loop5_4_delete_pack(pack_id: str) -> dict[str, object]:
+        try:
+            return admin_ok(admin_service.delete_pack(pack_id), dev_mock=False)
+        except KeyError:
+            return admin_error(code="pack_not_found", message="Sticker pack was not found.", stage="pack_delete", recoverable=False, actions=["refresh"], dev_mock=False)
+
+    @router.post("/api/admin/stickers/bulk-delete", summary="loop5.4 bulk delete stickers")
+    def loop5_4_bulk_delete_stickers(payload: dict[str, object] = Body(default_factory=dict)) -> dict[str, object]:
+        ids = payload.get("ids") or []
+        if not isinstance(ids, list) or not ids:
+            return admin_error(code="empty_delete_selection", message="No stickers were selected.", stage="bulk_delete", recoverable=True, actions=["select_rows"], dev_mock=False)
+        return admin_ok(admin_service.bulk_delete([str(item) for item in ids]), dev_mock=False)
+
+    @router.post("/api/admin/sticker-packs/bulk-delete", summary="loop5.4 bulk delete packs")
+    def loop5_4_bulk_delete_packs(payload: dict[str, object] = Body(default_factory=dict)) -> dict[str, object]:
+        return loop5_4_bulk_delete_stickers(payload)
+
+    @router.post("/api/admin/stickers/{sticker_id}/restore", summary="loop5.4 restore sticker")
+    def loop5_4_restore_sticker(sticker_id: str) -> dict[str, object]:
+        try:
+            return admin_ok(admin_service.restore_sticker(sticker_id), dev_mock=False)
+        except KeyError:
+            return admin_error(code="trash_item_not_found", message="Trash item was not found.", stage="sticker_restore", recoverable=False, actions=["refresh"], dev_mock=False)
+
+    @router.get("/api/admin/trash", summary="loop5.4 trash list")
+    def loop5_4_trash(page: int = 1, page_size: int = 20) -> dict[str, object]:
+        return admin_ok(admin_service.trash(page, page_size), dev_mock=False)
 
     @router.post("/api/admin/prompt/generate", summary="loop3 generate prompt")
     def loop3_generate_prompt(payload: dict[str, object] = Body(default_factory=dict)) -> dict[str, object]:
@@ -212,7 +341,147 @@ def 创建路由(
 
     @router.post("/api/admin/prompt/optimize-remote", summary="loop3 remote prompt fallback")
     def loop3_optimize_prompt_remote(payload: dict[str, object] = Body(default_factory=dict)) -> dict[str, object]:
-        return admin_ok(admin_service.optimize_prompt_remote(str(payload.get("prompt", ""))), dev_mock=False)
+        return admin_ok(
+            admin_service.optimize_prompt_remote(
+                str(payload.get("prompt", "")),
+                str(payload.get("theme", "")),
+                str(payload.get("platform", "WeChat")),
+                str(payload.get("style", "非扁平化")),
+            ),
+            dev_mock=False,
+        )
+
+    @router.post("/api/admin/prompt/remote-optimize", summary="loop5.1 remote prompt optimize")
+    def loop5_1_remote_optimize(payload: dict[str, object] = Body(default_factory=dict)) -> dict[str, object]:
+        return loop3_optimize_prompt_remote(payload)
+
+    @router.post("/api/admin/prompt/remote-test", summary="loop5.1 remote prompt test")
+    def loop5_1_remote_test(payload: dict[str, object] = Body(default_factory=dict)) -> dict[str, object]:
+        return admin_ok(admin_service.test_generation_source(payload), dev_mock=False)
+
+    @router.get("/api/admin/prompt/sources", summary="loop5.4 prompt sources")
+    def loop5_4_prompt_sources() -> dict[str, object]:
+        return admin_ok(admin_service.prompt_sources(), dev_mock=False)
+
+    @router.post("/api/admin/prompt/sources/refresh", summary="loop5.4 refresh prompt sources")
+    def loop5_4_refresh_prompt_sources(payload: dict[str, object] = Body(default_factory=dict)) -> dict[str, object]:
+        return admin_ok(admin_service.refresh_prompt_sources(bool(payload.get("allow_network", False))), dev_mock=False)
+
+    @router.post("/api/admin/prompt/build", summary="loop5.4 build meme prompt")
+    def loop5_4_build_prompt(payload: dict[str, object] = Body(default_factory=dict)) -> dict[str, object]:
+        return admin_ok(admin_service.build_prompt(payload), dev_mock=False)
+
+    @router.post("/api/admin/generation/create", summary="loop5.1 create generation")
+    def loop5_1_create_generation(payload: dict[str, object] = Body(default_factory=dict)) -> dict[str, object]:
+        return admin_ok(admin_service.create_generation(payload), dev_mock=False)
+
+    @router.get("/api/admin/strategy/sources", summary="loop5.5 external strategy sources")
+    def loop5_5_strategy_sources() -> dict[str, object]:
+        return admin_ok(admin_service.strategy_sources(), dev_mock=False)
+
+    @router.post("/api/admin/strategy/refresh-external", summary="loop5.5 refresh external strategy sources")
+    def loop5_5_refresh_external_strategy() -> dict[str, object]:
+        return admin_ok(admin_service.refresh_external_strategy(), dev_mock=False)
+
+    @router.post("/api/admin/uploads", summary="loop5.5 upload reference image")
+    def loop5_5_upload_reference(payload: dict[str, object] = Body(default_factory=dict)) -> dict[str, object]:
+        try:
+            return admin_ok(admin_service.create_upload(payload), dev_mock=False)
+        except ValueError:
+            return admin_error(code="unsupported_upload_type", message="Only jpg, png, webp and gif uploads are supported.", stage="upload", recoverable=True, actions=["choose_supported_file"], dev_mock=False)
+
+    @router.post("/api/admin/character-dna/analyze", summary="loop5.5 analyze character dna")
+    def loop5_5_analyze_character_dna(payload: dict[str, object] = Body(default_factory=dict)) -> dict[str, object]:
+        return admin_ok(admin_service.analyze_dna(payload), dev_mock=False)
+
+    @router.get("/api/admin/character-dna", summary="loop5.5 list character dna")
+    def loop5_5_list_character_dna() -> dict[str, object]:
+        return admin_ok(admin_service.list_character_dna(), dev_mock=False)
+
+    @router.post("/api/admin/sticker-plan/create", summary="loop5.5 create sticker plan")
+    def loop5_5_create_sticker_plan(payload: dict[str, object] = Body(default_factory=dict)) -> dict[str, object]:
+        return admin_ok(admin_service.create_sticker_plan(payload), dev_mock=False)
+
+    @router.get("/api/admin/sticker-plan/{plan_id}", summary="loop5.5 get sticker plan")
+    def loop5_5_get_sticker_plan(plan_id: str) -> dict[str, object]:
+        try:
+            return admin_ok(admin_service.get_sticker_plan(plan_id), dev_mock=False)
+        except KeyError:
+            return admin_error(code="sticker_plan_not_found", message="Sticker plan was not found.", stage="sticker_plan_detail", recoverable=False, actions=["create_plan"], dev_mock=False)
+
+    @router.post("/api/admin/generation/batch-from-plan", summary="loop5.5 batch generate from sticker plan")
+    def loop5_5_batch_from_plan(payload: dict[str, object] = Body(default_factory=dict)) -> dict[str, object]:
+        try:
+            return admin_ok(admin_service.batch_from_plan(payload), dev_mock=False)
+        except KeyError:
+            return admin_error(code="sticker_plan_not_found", message="Sticker plan was not found.", stage="batch_from_plan", recoverable=True, actions=["create_plan"], dev_mock=False)
+
+    @router.post("/api/admin/captions/generate", summary="loop5.5 generate captions")
+    def loop5_5_generate_captions(payload: dict[str, object] = Body(default_factory=dict)) -> dict[str, object]:
+        return admin_ok(admin_service.generate_captions(payload), dev_mock=False)
+
+    @router.get("/api/admin/captions/favorites", summary="loop5.5 caption favorites")
+    def loop5_5_caption_favorites(q: str | None = None) -> dict[str, object]:
+        return admin_ok(admin_service.caption_favorites(q), dev_mock=False)
+
+    @router.post("/api/admin/captions/favorites", summary="loop5.5 add caption favorite")
+    def loop5_5_add_caption_favorite(payload: dict[str, object] = Body(default_factory=dict)) -> dict[str, object]:
+        try:
+            return admin_ok(admin_service.add_caption_favorite(payload), dev_mock=False)
+        except ValueError:
+            return admin_error(code="caption_required", message="Caption is required.", stage="caption_favorite", recoverable=True, actions=["fill_caption"], dev_mock=False)
+
+    @router.delete("/api/admin/captions/favorites/{caption_id}", summary="loop5.5 delete caption favorite")
+    def loop5_5_delete_caption_favorite(caption_id: str) -> dict[str, object]:
+        try:
+            return admin_ok(admin_service.delete_caption_favorite(caption_id), dev_mock=False)
+        except KeyError:
+            return admin_error(code="caption_favorite_not_found", message="Caption favorite was not found.", stage="caption_favorite_delete", recoverable=False, actions=["refresh"], dev_mock=False)
+
+    @router.post("/api/admin/layout/safe-area", summary="loop5.5 layout safe area")
+    def loop5_5_layout_safe_area(payload: dict[str, object] = Body(default_factory=dict)) -> dict[str, object]:
+        return admin_ok(admin_service.safe_area(payload), dev_mock=False)
+
+    @router.post("/api/admin/render/text-overlay", summary="loop5.5 render text overlay")
+    def loop5_5_render_text_overlay(payload: dict[str, object] = Body(default_factory=dict)) -> dict[str, object]:
+        return admin_ok(admin_service.render_text_overlay(payload), dev_mock=False)
+
+    @router.post("/api/admin/render/gif-text", summary="loop5.5 render gif text")
+    def loop5_5_render_gif_text(payload: dict[str, object] = Body(default_factory=dict)) -> dict[str, object]:
+        return admin_ok(admin_service.render_gif_text(payload), dev_mock=False)
+
+    @router.post("/api/admin/export/wechat", summary="loop5.5 export wechat package")
+    def loop5_5_export_wechat(payload: dict[str, object] = Body(default_factory=dict)) -> dict[str, object]:
+        return admin_ok(admin_service.export_wechat(payload), dev_mock=False)
+
+    @router.post("/api/admin/export/zip", summary="loop5.5 export zip")
+    def loop5_5_export_zip(payload: dict[str, object] = Body(default_factory=dict)) -> dict[str, object]:
+        return admin_ok(admin_service.export_zip(payload), dev_mock=False)
+
+    @router.get("/api/admin/generation/tasks", summary="loop5.4 generation tasks")
+    def loop5_4_generation_tasks(page: int = 1, page_size: int = 20) -> dict[str, object]:
+        return admin_ok(admin_service.list_generation_tasks(page, page_size), dev_mock=False)
+
+    @router.get("/api/admin/generation/tasks/{task_id}", summary="loop5.4 generation task detail")
+    def loop5_4_generation_task(task_id: str) -> dict[str, object]:
+        try:
+            return admin_ok(admin_service.get_generation_task(task_id), dev_mock=False)
+        except KeyError:
+            return admin_error(code="generation_task_not_found", message="Generation task was not found.", stage="generation_task_detail", recoverable=False, actions=["refresh"], dev_mock=False)
+
+    @router.post("/api/admin/generation/tasks/{task_id}/cancel", summary="loop5.4 cancel generation task")
+    def loop5_4_cancel_generation_task(task_id: str) -> dict[str, object]:
+        try:
+            return admin_ok(admin_service.set_generation_task_status(task_id, "cancelled"), dev_mock=False)
+        except KeyError:
+            return admin_error(code="generation_task_not_found", message="Generation task was not found.", stage="generation_cancel", recoverable=False, actions=["refresh"], dev_mock=False)
+
+    @router.post("/api/admin/generation/tasks/{task_id}/retry", summary="loop5.4 retry generation task")
+    def loop5_4_retry_generation_task(task_id: str) -> dict[str, object]:
+        try:
+            return admin_ok(admin_service.set_generation_task_status(task_id, "retrying"), dev_mock=False)
+        except KeyError:
+            return admin_error(code="generation_task_not_found", message="Generation task was not found.", stage="generation_retry", recoverable=False, actions=["refresh"], dev_mock=False)
 
     @router.get("/api/admin/prompt/history", summary="loop3 prompt history")
     def loop3_prompt_history() -> dict[str, object]:
@@ -226,7 +495,14 @@ def 创建路由(
     def loop3_batch_export(payload: dict[str, object] = Body(default_factory=dict)) -> dict[str, object]:
         ids = payload.get("ids") or []
         if not isinstance(ids, list) or not ids:
-            return admin_error("empty_export_selection", "No export rows were selected.", "export_batch", True, ["select_rows"])
+            return admin_error(
+                code="empty_export_selection",
+                message="No export rows were selected.",
+                stage="export_batch",
+                recoverable=True,
+                actions=["select_rows"],
+                dev_mock=False,
+            )
         return admin_ok(admin_service.batch_export([str(item) for item in ids]), dev_mock=False)
 
     @router.post("/api/admin/exports/{export_id}/run", summary="loop3 run export")
@@ -234,14 +510,32 @@ def 创建路由(
         try:
             return admin_ok(admin_service.run_export(export_id), dev_mock=False)
         except KeyError:
-            return admin_error("export_not_found", "Export task was not found.", "export_run", False, ["refresh"])
+            return admin_error(
+                code="export_not_found",
+                message="Export task was not found.",
+                stage="export_run",
+                recoverable=False,
+                actions=["refresh"],
+                dev_mock=False,
+            )
 
     @router.get("/api/admin/exports/{export_id}", summary="loop3 export detail")
     def loop3_export_detail(export_id: str) -> dict[str, object]:
         for row in admin_service.list_exports(1, 1000)["items"]:
             if row["id"] == export_id:
                 return admin_ok(row, dev_mock=False)
-        return admin_error("export_not_found", "Export task was not found.", "export_detail", False, ["refresh"])
+        return admin_error(
+            code="export_not_found",
+            message="Export task was not found.",
+            stage="export_detail",
+            recoverable=False,
+            actions=["refresh"],
+            dev_mock=False,
+        )
+
+    @router.get("/api/admin/analytics", summary="loop5.1 analytics")
+    def loop5_1_analytics() -> dict[str, object]:
+        return admin_ok(admin_service.analytics(), dev_mock=False)
 
     @router.get("/api/admin/settings/platform-rules", summary="loop3 platform rules")
     def loop3_platform_rules() -> dict[str, object]:
@@ -258,31 +552,31 @@ def 创建路由(
             }
             for name in ["WeChat", "Telegram", "LINE", "WhatsApp"]
         ]
-        return admin_ok({"items": rules}, dev_mock=True)
+        return admin_ok({"items": rules}, dev_mock=False)
 
     @router.put("/api/admin/settings/platform-rules/{platform}", summary="loop3 save platform rule")
     def loop3_save_platform_rule(platform: str, payload: dict[str, object] = Body(default_factory=dict)) -> dict[str, object]:
-        return admin_ok({"platform": platform, "payload": payload}, dev_mock=True)
+        return admin_ok({"platform": platform, "payload": payload}, dev_mock=False)
 
     @router.get("/api/admin/settings/generation-sources", summary="loop3 generation sources")
     def loop3_generation_sources() -> dict[str, object]:
-        data = {
-            "local_prompt_generator": True,
-            "remote_prompt_optimizer_url": "",
-            "enabled": False,
-            "timeout_ms": 1200,
-            "fallback_strategy": "local",
-            "last_call_status": "fallback_ready",
-        }
-        return admin_ok(data, dev_mock=True)
+        return admin_ok(admin_service.get_generation_source(), dev_mock=False)
+
+    @router.get("/api/admin/settings/generation-source", summary="loop5.1 generation source")
+    def loop5_1_generation_source() -> dict[str, object]:
+        return loop3_generation_sources()
 
     @router.put("/api/admin/settings/generation-sources", summary="loop3 save generation sources")
     def loop3_save_generation_sources(payload: dict[str, object] = Body(default_factory=dict)) -> dict[str, object]:
-        return admin_ok({"payload": payload}, dev_mock=True)
+        return admin_ok(admin_service.save_generation_source(payload), dev_mock=False)
+
+    @router.post("/api/admin/settings/generation-source", summary="loop5.1 save generation source")
+    def loop5_1_save_generation_source(payload: dict[str, object] = Body(default_factory=dict)) -> dict[str, object]:
+        return loop3_save_generation_sources(payload)
 
     @router.post("/api/admin/settings/generation-sources/test", summary="loop3 test generation source")
-    def loop3_test_generation_source() -> dict[str, object]:
-        return admin_ok({"remote": "unavailable", "fallback": "local"}, dev_mock=True)
+    def loop3_test_generation_source(payload: dict[str, object] = Body(default_factory=dict)) -> dict[str, object]:
+        return admin_ok(admin_service.test_generation_source(payload), dev_mock=False)
 
     @router.get("/health", response_model=标准响应, summary="健康检查")
     def 健康检查() -> 标准响应:
@@ -290,248 +584,11 @@ def 创建路由(
 
     @router.get("/", response_class=HTMLResponse, summary="Owner 后台首页")
     def Owner后台首页() -> HTMLResponse:
-        return HTMLResponse(V7_ADMIN_HTML)
+        return HTMLResponse(load_admin_html())
 
     @router.get("/admin", response_class=HTMLResponse, summary="运营管理后台")
     def 运营管理后台() -> HTMLResponse:
-        return HTMLResponse(V7_ADMIN_HTML)
-        return HTMLResponse(
-            """
-            <!doctype html>
-            <html lang="zh-CN">
-            <head>
-              <meta charset="utf-8">
-              <meta name="viewport" content="width=device-width, initial-scale=1">
-              <link rel="icon" href="data:,">
-              <title>表情包运营后台</title>
-              <style>
-                * { box-sizing: border-box; }
-                body { margin: 0; font-family: "Microsoft YaHei", Arial, sans-serif; color: #1f2933; background: #eef2f6; }
-                .layout { display: grid; grid-template-columns: 224px 1fr; min-height: 100vh; }
-                .sidebar { background: #182331; color: #d7dde6; padding: 18px 14px; }
-                .brand { color: #ffffff; font-size: 18px; font-weight: 700; margin: 6px 8px 20px; }
-                .nav { display: grid; gap: 6px; }
-                .nav a { color: #d7dde6; text-decoration: none; padding: 10px 12px; border-radius: 6px; font-size: 14px; }
-                .nav a.active, .nav a:hover { background: #263647; color: #ffffff; }
-                .workspace { min-width: 0; padding: 18px 22px 28px; }
-                .topbar { display: flex; justify-content: space-between; gap: 16px; align-items: center; margin-bottom: 14px; }
-                h1 { margin: 0; font-size: 24px; }
-                h2 { font-size: 15px; margin: 0 0 10px; }
-                .subtext, .muted { color: #657385; font-size: 13px; }
-                .identity { display: flex; gap: 8px; align-items: center; background: #ffffff; border: 1px solid #d7dee8; padding: 10px; border-radius: 8px; }
-                input, select { height: 34px; border: 1px solid #b8c4d2; border-radius: 6px; padding: 0 10px; background: #fff; color: #1f2933; }
-                button { height: 34px; border: 1px solid #246b8f; border-radius: 6px; background: #246b8f; color: white; padding: 0 12px; cursor: pointer; font-weight: 600; }
-                button.secondary { background: #ffffff; color: #246b8f; }
-                button:disabled { cursor: wait; opacity: .65; }
-                .actionbar { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0 16px; }
-                .summary { display: grid; grid-template-columns: repeat(5, minmax(130px, 1fr)); gap: 10px; margin-bottom: 16px; }
-                .metric, .panel { background: #ffffff; border: 1px solid #d7dee8; border-radius: 8px; }
-                .metric { padding: 14px; min-height: 84px; }
-                .metric strong { display: block; font-size: 24px; margin-top: 8px; }
-                .board { display: grid; grid-template-columns: 1.35fr .95fr; gap: 14px; align-items: start; }
-                .panel { padding: 14px; margin-bottom: 14px; }
-                .panel-head { display: flex; justify-content: space-between; gap: 12px; align-items: center; margin-bottom: 10px; }
-                table { width: 100%; border-collapse: collapse; background: #ffffff; table-layout: fixed; }
-                th, td { border-bottom: 1px solid #e6ebf2; padding: 9px 8px; text-align: left; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-                th { color: #435269; background: #f4f7fa; font-weight: 700; }
-                .empty { padding: 12px; color: #6b7280; background: #f8fafc; border: 1px dashed #cbd5df; border-radius: 6px; }
-                .status-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
-                .status-item { background: #f8fafc; border: 1px solid #e0e7ef; border-radius: 6px; padding: 10px; font-size: 13px; }
-                .asset-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
-                .asset-tile { border: 1px solid #d7dee8; border-radius: 8px; padding: 8px; background: #fbfcfe; min-width: 0; }
-                .asset-tile img { width: 100%; aspect-ratio: 1 / 1; object-fit: contain; background: linear-gradient(45deg, #f0f3f7 25%, transparent 25%), linear-gradient(-45deg, #f0f3f7 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #f0f3f7 75%), linear-gradient(-45deg, transparent 75%, #f0f3f7 75%); background-size: 16px 16px; background-position: 0 0, 0 8px, 8px -8px, -8px 0; border-radius: 6px; }
-                .asset-tile div { margin-top: 6px; font-size: 12px; color: #4b5b70; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-                pre { background: #121826; color: #e5e7eb; border-radius: 8px; padding: 12px; overflow: auto; max-height: 180px; font-size: 12px; }
-                @media (max-width: 980px) {
-                  .layout { grid-template-columns: 1fr; }
-                  .sidebar { position: static; }
-                  .board, .summary { grid-template-columns: 1fr; }
-                  .topbar, .identity { align-items: stretch; flex-direction: column; }
-                  .asset-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-                }
-              </style>
-            </head>
-            <body>
-              <div class="layout">
-                <aside class="sidebar">
-                  <div class="brand">表情包运营后台</div>
-                  <nav class="nav" aria-label="后台导航">
-                    <a class="active" href="#overview">总览</a>
-                    <a href="#generation">生成工作台</a>
-                    <a href="#review">审核工作台</a>
-                    <a href="#loop">系统设置</a>
-                    <a href="#log">操作回执</a>
-                  </nav>
-                </aside>
-                <main class="workspace">
-                  <div class="topbar">
-                    <div>
-                      <h1>总览</h1>
-                      <div class="subtext">生产、审核、发布、回流与门禁状态集中处理</div>
-                    </div>
-                    <div class="identity">
-                      <label>操作人 <input id="operatorId" value="运营员-演示" aria-label="操作人编号"></label>
-                      <label>角色
-                        <select id="operatorRole" aria-label="操作人角色">
-                          <option value="operator">运营</option>
-                          <option value="admin">管理员</option>
-                          <option value="reviewer">审核员</option>
-                        </select>
-                      </label>
-                    </div>
-                  </div>
-                  <div class="actionbar" aria-label="主要操作">
-                    <button id="demoButton" type="button" onclick="demoGenerate()">一键生成演示套装</button>
-                    <button type="button" onclick="runSchedules()">执行定时任务</button>
-                    <button type="button" class="secondary" onclick="loadOverview()">刷新总览</button>
-                  </div>
-                  <section id="overview" class="summary" aria-label="运营总览"></section>
-                  <div class="board">
-                    <div>
-                      <section id="generation" class="panel">
-                        <div class="panel-head">
-                          <h2>生成工作台</h2>
-                          <span class="muted">策略、套装、图片资产</span>
-                        </div>
-                        <div id="strategyTable" class="empty">等待加载生成策略</div>
-                      </section>
-                      <section class="panel">
-                        <div class="panel-head">
-                          <h2>调度执行记录</h2>
-                          <span class="muted">后台任务触发与执行结果</span>
-                        </div>
-                        <div id="scheduleTable" class="empty">等待加载定时任务</div>
-                      </section>
-                      <section id="review" class="panel">
-                        <div class="panel-head">
-                          <h2>审核工作台</h2>
-                          <span class="muted">复核、发布任务、外网隔离边界</span>
-                        </div>
-                        <div id="publishTable" class="empty">等待加载发布任务</div>
-                      </section>
-                    </div>
-                    <div>
-                      <section class="panel">
-                        <div class="panel-head">
-                          <h2>资产预览</h2>
-                          <span class="muted" id="assetStatus">尚未生成</span>
-                        </div>
-                          <div id="assetPreview" class="empty">点击“一键生成演示套装”后在这里预览透明图片</div>
-                      </section>
-                      <section id="loop" class="panel">
-                        <div class="panel-head">
-                          <h2>系统诊断</h2>
-                          <span class="muted">失败项再执行队列</span>
-                        </div>
-                        <div id="gateTable" class="empty">等待加载门禁与再执行队列</div>
-                      </section>
-                      <section class="panel">
-                        <div class="panel-head">
-                          <h2>业务状态</h2>
-                          <span class="muted">当前后台可用性</span>
-                        </div>
-                        <div class="status-list">
-                          <div class="status-item">主动生成：<strong id="generateState">待触发</strong></div>
-                          <div class="status-item">外网发布：<strong>本地回执</strong></div>
-                          <div class="status-item">密钥读取：<strong>生成阶段禁止</strong></div>
-                          <div class="status-item">操作日志：<strong id="logState">等待操作</strong></div>
-                        </div>
-                      </section>
-                    </div>
-                  </div>
-                  <section id="log" class="panel">
-                    <div class="panel-head">
-                      <h2>操作回执</h2>
-                      <span class="muted">仅展示本次操作回执，不展示密钥</span>
-                    </div>
-                    <pre id="output">等待操作</pre>
-                  </section>
-                </main>
-              </div>
-              <script>
-                function headerSafeOperatorId() {
-                  const value = document.getElementById("operatorId").value.trim();
-                  return /^[\\x20-\\x7E]+$/.test(value) ? value : encodeURIComponent(value);
-                }
-                function headers() {
-                  return {"X-Operator-ID": headerSafeOperatorId(), "X-Operator-Role": document.getElementById("operatorRole").value};
-                }
-                async function callApi(path, options) {
-                  const response = await fetch(path, Object.assign({headers: headers()}, options || {}));
-                  const text = await response.text();
-                  const payload = JSON.parse(text);
-                  document.getElementById("output").textContent = `接口回执：${payload.消息}；业务结果：${payload.成功 ? "成功" : "失败"}`;
-                  document.getElementById("logState").textContent = response.ok ? "已记录" : "需处理";
-                  return payload;
-                }
-                function renderCards(stats) {
-                  document.getElementById("overview").innerHTML = Object.entries(stats).map(([key, value]) => `<div class="metric"><span>${key}</span><strong>${value}</strong></div>`).join("");
-                }
-                function displayValue(value) {
-                  if (value === "Telegram") { return "通用透明图"; }
-                  return String(value ?? "").replaceAll("透明PNG", "透明图片").replaceAll("PNG", "透明图片").replaceAll("透明透明图片", "透明图片");
-                }
-                function renderTable(target, rows, columns) {
-                  const node = document.getElementById(target);
-                  if (!rows || rows.length === 0) { node.className = "empty"; node.textContent = "暂无记录"; return; }
-                  node.className = "";
-                  const head = columns.map(column => `<th>${column[0]}</th>`).join("");
-                  const body = rows.map(row => `<tr>${columns.map(column => `<td>${displayValue(row[column[1]])}</td>`).join("")}</tr>`).join("");
-                  node.innerHTML = `<table><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>`;
-                }
-                async function loadOverview() {
-                  const payload = await callApi("/v1/运营后台/总览");
-                  const data = payload.数据;
-                  renderCards(data.统计);
-                  renderTable("scheduleTable", data.定时任务, [["任务名称", "任务名称"], ["执行周期", "执行周期"], ["状态", "状态"]]);
-                  renderTable("strategyTable", data.生成策略, [["生成类型", "生成类型"], ["目标平台", "目标平台"], ["表情数量", "表情数量"]]);
-                  renderTable("publishTable", data.发布任务, [["发布平台", "发布平台"], ["发布方式", "发布方式"], ["状态", "状态"]]);
-                  renderTable("gateTable", data.再执行队列, [["验收项", "验收项"], ["状态", "状态"], ["失败原因", "失败原因"]]);
-                }
-                async function fetchAssetObjectUrl(path) {
-                  const response = await fetch(path, {headers: headers()});
-                  if (!response.ok) { throw new Error(`资产预览下载失败：${response.status}`); }
-                  return URL.createObjectURL(await response.blob());
-                }
-                async function renderAssets(data) {
-                  const assets = data.可预览图片 || [];
-                  const preview = document.getElementById("assetPreview");
-                  document.getElementById("assetStatus").textContent = `${assets.length} 张已生成`;
-                  document.getElementById("generateState").textContent = "生成完成";
-                  if (assets.length === 0) { preview.className = "empty"; preview.textContent = "本次没有生成可预览图片"; return; }
-                  preview.className = "asset-grid";
-                  const tiles = await Promise.all(assets.map(async item => {
-                    const url = await fetchAssetObjectUrl(item.下载地址);
-                    return `<div class="asset-tile"><img src="${url}" alt="${item.文案}"><div title="${item.文案}">${item.序号}. ${item.文案}</div></div>`;
-                  }));
-                  preview.innerHTML = tiles.join("");
-                }
-                async function demoGenerate() {
-                  const button = document.getElementById("demoButton");
-                  button.disabled = true;
-                  button.textContent = "正在生成";
-                  document.getElementById("generateState").textContent = "生成中";
-                  try {
-                    const payload = await callApi("/v1/运营后台/演示生成", {method: "POST", headers: Object.assign(headers(), {"Content-Type": "application/json"}), body: "{}"});
-                    await renderAssets(payload.数据);
-                    await loadOverview();
-                    document.getElementById("output").textContent = `接口回执：${payload.消息}；已生成 ${payload.数据.生成数量} 张透明图片`;
-                  } finally {
-                    button.disabled = false;
-                    button.textContent = "一键生成演示套装";
-                  }
-                }
-                async function runSchedules() {
-                  await callApi("/v1/定时任务/执行", {method: "POST", headers: Object.assign(headers(), {"Content-Type": "application/json"}), body: "{}"});
-                  await loadOverview();
-                }
-                loadOverview();
-              </script>
-            </body>
-            </html>
-            """
-        )
-
+        return HTMLResponse(load_admin_html())
     @router.get("/v1/运营后台/总览", response_model=标准响应, summary="查询运营后台总览")
     def 查询运营后台总览(当前操作人: 操作人 = Depends(获取操作人)) -> 标准响应:
         要求角色(当前操作人, {"管理员", "运营", "审核员"})

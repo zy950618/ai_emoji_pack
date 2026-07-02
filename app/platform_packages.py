@@ -30,9 +30,16 @@ class 平台包服务:
         self.审计 = 审计
         self.规则治理 = 规则治理
 
-    def 套装列表(self) -> list[dict[str, object]]:
+    def 套装列表(
+        self,
+        目标平台: str | None = None,
+        目标受众: str | None = None,
+        状态: str | None = None,
+        风格标签: list[str] | None = None,
+    ) -> list[dict[str, object]]:
         rows = self.数据库.查询全部("SELECT * FROM sticker_sets ORDER BY 创建时间 ASC")
         packs = []
+        style_filter = {style for style in (风格标签 or []) if style}
         for row in rows:
             strategy = self.数据库.查询一条("SELECT * FROM generation_strategies WHERE 策略编号 = ?", (row["策略编号"],))
             strategy_content = json.loads(strategy["策略内容"]) if strategy else {}
@@ -56,46 +63,53 @@ class 平台包服务:
             item_reports = [json.loads(item["质量报告"] or "{}") for item in items if item["质量报告"]]
             first_score = item_reports[0].get("评分", {}) if item_reports else {}
             failed_reasons = sorted({reason for report in item_reports for reason in report.get("失败原因", [])})
-            packs.append(
-                {
-                    "套装编号": row["套装编号"],
-                    "标题": row["标题"],
-                    "目标受众": row["目标受众"],
-                    "目标平台": strategy_content.get("目标平台", ""),
-                    "风格标签": strategy_content.get("风格标签", json.loads(row["标签"])),
-                    "使用场景": json.loads(row["使用场景"]),
-                    "状态": status,
-                    "创建时间": row["创建时间"],
-                    "表情数量": len(items),
-                    "封面预览": preview_items[0]["下载地址"] if preview_items else "",
-                    "预览图片": preview_items,
-                    "年龄层": "20-35",
-                    "性别倾向": "中性",
-                    "爱好": ["社交聊天", "轻松表达", "办公沟通"],
-                    "静态动态": "静态",
-                    "审美分": first_score.get("审美总分", 91),
-                    "受众匹配分": 90,
-                    "风格一致性分": set_scores.get("风格一致性", 90),
-                    "套装差异性分": set_scores.get("套装差异性", 86),
-                    "动态感分": first_score.get("静态动势", 86),
-                    "动态自然度分": first_score.get("动态自然度", 86),
-                    "小图可读性分": first_score.get("小图可读性", 90),
-                    "贴纸质感分": first_score.get("贴纸质感", 88),
-                    "目标风格分": first_score.get("目标风格分", 90),
-                    "可爱感分": first_score.get("可爱感", 90),
-                    "搞笑感分": first_score.get("搞笑感", 86),
-                    "卖萌感分": first_score.get("卖萌感", 88),
-                    "时尚感分": first_score.get("时尚感", 84),
-                    "实物贴纸感分": first_score.get("贴纸质感", 88),
-                    "失败原因": failed_reasons + list(set_scores.get("失败原因", [])),
-                    "质量报告": set_quality,
-                    "风格体系": json.loads(row["风格体系"] or "{}"),
-                    "平台规格状态": "已生成平台包" if latest_package else "待下载前检查",
-                    "审核状态": "待审核" if status != "已审核" else "审核通过",
-                    "下载状态": "可导出" if preview_items else "待生成素材",
-                    "下载能力": ["单张下载", "套装下载", "平台发布包导出", "下载前检查"],
-                }
-            )
+            pack = {
+                "套装编号": row["套装编号"],
+                "标题": row["标题"],
+                "目标受众": row["目标受众"],
+                "目标平台": strategy_content.get("目标平台", ""),
+                "风格标签": strategy_content.get("风格标签", json.loads(row["标签"])),
+                "使用场景": json.loads(row["使用场景"]),
+                "状态": status,
+                "创建时间": row["创建时间"],
+                "表情数量": len(items),
+                "封面预览": preview_items[0]["下载地址"] if preview_items else "",
+                "预览图片": preview_items,
+                "年龄层": "20-35",
+                "性别倾向": "中性",
+                "爱好": ["社交聊天", "轻松表达", "办公沟通"],
+                "静态动态": "静态",
+                "审美分": first_score.get("审美总分", 91),
+                "受众匹配分": 90,
+                "风格一致性分": set_scores.get("风格一致性", 90),
+                "套装差异性分": set_scores.get("套装差异性", 86),
+                "动态感分": first_score.get("静态动势", 86),
+                "动态自然度分": first_score.get("动态自然度", 86),
+                "小图可读性分": first_score.get("小图可读性", 90),
+                "贴纸质感分": first_score.get("贴纸质感", 88),
+                "目标风格分": first_score.get("目标风格分", 90),
+                "可爱感分": first_score.get("可爱感", 90),
+                "搞笑感分": first_score.get("搞笑感", 86),
+                "卖萌感分": first_score.get("卖萌感", 88),
+                "时尚感分": first_score.get("时尚感", 84),
+                "实物贴纸感分": first_score.get("贴纸质感", 88),
+                "失败原因": failed_reasons + list(set_scores.get("失败原因", [])),
+                "质量报告": set_quality,
+                "风格体系": json.loads(row["风格体系"] or "{}"),
+                "平台规格状态": "已生成平台包" if latest_package else "待下载前检查",
+                "审核状态": "待审核" if status != "已审核" else "审核通过",
+                "下载状态": "可导出" if preview_items else "待生成素材",
+                "下载能力": ["单张下载", "套装下载", "平台发布包导出", "下载前检查"],
+            }
+            if 目标平台 and pack["目标平台"] != 目标平台:
+                continue
+            if 目标受众 and pack["目标受众"] != 目标受众:
+                continue
+            if 状态 and 状态 not in {str(pack["状态"]), str(pack["审核状态"]), str(pack["下载状态"])}:
+                continue
+            if style_filter and not style_filter.intersection(str(style) for style in pack["风格标签"]):
+                continue
+            packs.append(pack)
         return packs
 
     def 生成平台包(self, 操作人编号: str, 套装编号: str, 平台名称: str) -> dict[str, object]:

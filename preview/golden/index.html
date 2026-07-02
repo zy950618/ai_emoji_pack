@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>表情包工坊 Pro — v5 交互式后台预览</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body data-theme="aurora">
+  <div id="app" class="app-shell">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-mark">犬</div>
+        <div>
+          <div class="brand-title">表情包工坊</div>
+          <div class="brand-sub">Single Owner Pro · v5</div>
+        </div>
+      </div>
+      <nav id="nav" class="nav"></nav>
+      <div class="owner-card">
+        <div class="owner-avatar">赵</div>
+        <div class="owner-meta">
+          <strong>管理员</strong>
+          <span>Owner 模式</span>
+        </div>
+        <button class="icon-button" title="收起侧栏">‹</button>
+      </div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div class="page-heading">
+          <h1 id="pageTitle">总览</h1>
+          <p id="pageSubtitle">今天的生成、质检、导出和平台风险</p>
+        </div>
+        <div class="topbar-actions">
+          <label class="search-box">
+            <span>⌕</span>
+            <input id="globalSearch" placeholder="搜索表情包、任务、平台、失败原因" />
+          </label>
+          <select id="themeSelect" class="theme-select" title="主题切换">
+            <option value="aurora">极光蓝</option>
+            <option value="graphite">石墨灰</option>
+            <option value="sakura">樱花粉</option>
+            <option value="forest">森林绿</option>
+          </select>
+          <button id="dateRange" class="ghost-button">2026-07-01 · 今天</button>
+          <button id="refreshBtn" class="ghost-button">刷新</button>
+          <button id="newTaskBtn" class="primary-button">新建生成</button>
+        </div>
+      </header>
+      <section id="content" class="content"></section>
+    </main>
+  </div>
+
+  <div id="drawer" class="drawer" aria-hidden="true"></div>
+  <div id="modal" class="modal-layer" aria-hidden="true"></div>
+  <div id="toast" class="toast-stack"></div>
+
+  <script src="./app.js"></script>
+</body>
+</html>

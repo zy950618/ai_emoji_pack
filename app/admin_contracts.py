@@ -4,15 +4,20 @@ from uuid import uuid4
 
 
 def admin_ok(data: Any, *, dev_mock: bool = False) -> dict[str, Any]:
+    meta: dict[str, Any] = {
+        "request_id": f"req_{uuid4().hex}",
+        "timestamp": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
+        "dev_mock": dev_mock,
+    }
+    if isinstance(data, dict):
+        for key in ("page", "page_size", "total"):
+            if key in data:
+                meta[key] = data[key]
     return {
         "ok": True,
         "data": data,
         "error": None,
-        "meta": {
-            "request_id": f"req_{uuid4().hex}",
-            "timestamp": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
-            "dev_mock": dev_mock,
-        },
+        "meta": meta,
     }
 
 

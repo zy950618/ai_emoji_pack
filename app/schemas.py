@@ -1,4 +1,6 @@
+from datetime import UTC, datetime
 from typing import Any
+from uuid import uuid4
 
 from pydantic import BaseModel, Field
 
@@ -8,6 +10,27 @@ class 标准响应(BaseModel):
     消息: str
     数据: Any | None = None
     错误码: str | None = None
+    code: int | None = None
+    message: str | None = None
+    data: Any | None = None
+    request_id: str = Field(default_factory=lambda: f"req_{uuid4().hex}")
+    timestamp: str = Field(default_factory=lambda: datetime.now(UTC).isoformat().replace("+00:00", "Z"))
+    detail: Any | None = None
+
+    def model_post_init(self, __context: Any) -> None:
+        if self.code is None:
+            self.code = 0 if self.成功 else 40000
+        if self.message is None:
+            self.message = self.消息
+        if self.data is None:
+            self.data = self.数据
+        if not self.成功 and self.detail is None:
+            detail: dict[str, Any] = {}
+            if self.错误码:
+                detail["error_code"] = self.错误码
+            if self.数据 is not None:
+                detail["data"] = self.数据
+            self.detail = detail or None
 
 
 class 创建任务请求(BaseModel):
