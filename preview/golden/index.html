@@ -1,62 +1,135 @@
 <!doctype html>
 <html lang="zh-CN">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>表情包工坊 Pro — v5 交互式后台预览</title>
-  <link rel="stylesheet" href="./styles.css" />
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>表情包制作系统 · v6 交互预览</title>
+<style>
+:root{
+  --bg:#f5f7fb;--panel:#fff;--line:#e5e9f2;--ink:#101828;--text:#344054;--muted:#667085;
+  --blue:#2563eb;--blue-soft:#eaf1ff;--green:#16a56a;--green-soft:#e9f9ef;--orange:#f59e0b;--orange-soft:#fff7e6;--red:#e5484d;--red-soft:#fff0f0;--purple:#7c3aed;--purple-soft:#f4edff;
+  --shadow:0 14px 42px rgba(16,24,40,.07);--shadow-sm:0 6px 18px rgba(16,24,40,.05);
+  --r:20px;--side:244px;--rail:356px;
+}
+*{box-sizing:border-box}
+body{margin:0;color:var(--ink);background:radial-gradient(circle at 90% -5%,rgba(37,99,235,.12),transparent 30%),radial-gradient(circle at 20% -10%,rgba(245,158,11,.12),transparent 28%),var(--bg);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",Arial,sans-serif}
+button,input,select,textarea{font-family:inherit}button{cursor:pointer}
+.app{display:grid;grid-template-columns:var(--side) minmax(0,1fr);min-height:100vh}
+.side{position:sticky;top:0;height:100vh;padding:22px 16px;background:rgba(255,255,255,.92);border-right:1px solid var(--line);backdrop-filter:blur(14px)}
+.brand{display:flex;gap:12px;align-items:center;padding:0 4px 18px;border-bottom:1px solid var(--line)}
+.logo{width:42px;height:42px;border-radius:15px;background:linear-gradient(135deg,#ffd45f,#f97316);display:grid;place-items:center;font-weight:950;color:#4b2800}
+.brand h1{font-size:16px;margin:0}.brand p{font-size:12px;color:var(--muted);margin:4px 0 0}
+.nav{display:flex;flex-direction:column;gap:6px;margin-top:18px}
+.nav button{border:0;background:transparent;border-radius:14px;padding:11px 12px;display:flex;gap:10px;align-items:center;color:#344054;font-weight:850}
+.nav i{font-style:normal;width:26px;height:26px;border-radius:9px;background:#eef2f8;color:#667085;display:grid;place-items:center;font-size:12px}
+.nav button.active{background:#eaf1ff;color:var(--blue);box-shadow:inset 0 0 0 1px #cbdcff}.nav button.active i{background:var(--blue);color:white}
+.side-note{position:absolute;bottom:18px;left:16px;right:16px;background:#fff;border:1px solid var(--line);border-radius:18px;padding:12px;box-shadow:var(--shadow-sm)}
+.side-note b{font-size:13px}.side-note p{font-size:12px;line-height:1.45;color:var(--muted);margin:5px 0 0}
+.main{padding:24px 28px 42px;min-width:0}
+.top{display:flex;align-items:center;justify-content:space-between;gap:18px;margin-bottom:18px}
+.title h2{font-size:30px;margin:0;letter-spacing:-.04em}.title p{color:var(--muted);margin:7px 0 0}
+.actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
+.search input{width:310px;border:1px solid var(--line);border-radius:14px;padding:10px 12px;background:#fff;outline:none}
+.btn{border:1px solid #d0d5dd;background:#fff;border-radius:14px;color:#344054;padding:10px 14px;font-weight:900;display:inline-flex;align-items:center;justify-content:center;gap:8px;box-shadow:0 2px 8px rgba(16,24,40,.03)}
+.btn.primary{background:var(--blue);border-color:var(--blue);color:white}.btn.soft{background:var(--blue-soft);border-color:#cbdcff;color:var(--blue)}.btn.green{background:var(--green-soft);border-color:#c7eed8;color:var(--green)}.btn.danger{background:var(--red-soft);border-color:#ffd1d1;color:#d92d2d}.btn:disabled{opacity:.55;cursor:not-allowed}
+.page{display:none}.page.active{display:block}
+.card{background:rgba(255,255,255,.96);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow);padding:18px}
+.card.compact{padding:14px}.head{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;margin-bottom:14px}
+.head h3{margin:0;font-size:18px;letter-spacing:-.02em}.head p{margin:5px 0 0;color:var(--muted);font-size:13px;line-height:1.5}
+.tag{display:inline-flex;border-radius:999px;padding:4px 8px;font-size:12px;font-weight:900;background:#f2f4f7;color:#475467}.tag.blue{background:var(--blue-soft);color:var(--blue)}.tag.green{background:var(--green-soft);color:var(--green)}.tag.orange{background:var(--orange-soft);color:#a66200}.tag.red{background:var(--red-soft);color:var(--red)}.tag.purple{background:var(--purple-soft);color:var(--purple)}
+.grid{display:grid;gap:16px}.two{grid-template-columns:1fr 1fr}.three{grid-template-columns:repeat(3,1fr)}.four{grid-template-columns:repeat(4,1fr)}
+.hero{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(360px,.65fr);gap:18px;margin-bottom:18px}
+.hero-main{background:linear-gradient(135deg,#fff,#f7faff);border:1px solid var(--line);border-radius:28px;box-shadow:var(--shadow);padding:24px;min-height:248px}
+.hero-main h3{font-size:31px;line-height:1.14;margin:10px 0 10px;letter-spacing:-.05em}.hero-main p{color:var(--muted);line-height:1.65;margin:0 0 18px}
+.flow{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px}.flow div{background:#fff;border:1px solid var(--line);border-radius:16px;padding:12px}.flow b{font-size:13px}.flow span{display:block;font-size:12px;color:var(--muted);margin-top:4px}
+.kpis{display:grid;grid-template-columns:1fr 1fr;gap:12px}.kpi{background:#fff;border:1px solid var(--line);border-radius:18px;padding:15px;box-shadow:var(--shadow-sm)}.kpi small{display:block;color:var(--muted);font-weight:800}.kpi strong{display:block;font-size:30px;margin:8px 0}
+.steps{display:grid;grid-template-columns:280px minmax(0,1fr) 330px;gap:18px;align-items:start}.step-tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}.step-tabs button{border:1px solid var(--line);background:#fff;border-radius:999px;padding:8px 12px;color:#667085;font-weight:900}.step-tabs button.active{background:#111827;color:#fff}
+.field{margin-bottom:12px}.field label{display:block;font-size:12px;color:#475467;font-weight:950;margin-bottom:7px}.field input,.field select,.field textarea{width:100%;border:1px solid var(--line);background:#fff;border-radius:13px;padding:11px 12px;outline:none}.field textarea{min-height:120px;line-height:1.6}
+.chips{display:flex;flex-wrap:wrap;gap:8px}.chip{border:1px solid var(--line);background:#fff;border-radius:999px;padding:7px 10px;font-size:12px;font-weight:850;color:#475467}.chip.active{background:#111827;color:white;border-color:#111827}
+.upload{border:1.5px dashed #b7c9ec;background:linear-gradient(135deg,#fbfdff,#f4f8ff);border-radius:18px;padding:18px;text-align:center}.upload b{display:block;margin-bottom:5px}.upload span{font-size:13px;color:var(--muted)}
+.mini{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:12px}.mini div,.mini-card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:11px}.mini b,.mini-card b{font-size:13px}.mini span,.mini-card span{display:block;color:var(--muted);font-size:12px;line-height:1.45;margin-top:4px}
+.layer{background:#fff;border:1px solid var(--line);border-radius:15px;padding:12px;margin-bottom:10px}.layer b{display:block;margin-bottom:5px}.layer span{font-size:13px;color:#475467;line-height:1.6}
+.candidate-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px}
+.candidate{background:#fff;border:1px solid var(--line);border-radius:18px;padding:10px;box-shadow:var(--shadow-sm)}
+.art{height:198px;border:1px solid var(--line);border-radius:15px;background:#f8fafc;overflow:hidden}.art svg,.thumb svg,.asset-img svg,.detail-img svg,.big svg{width:100%;height:100%;display:block}.candidate h4{margin:10px 0 6px;font-size:15px}.tools{display:flex;gap:7px;flex-wrap:wrap;margin-top:9px}.tools .btn{font-size:12px;padding:8px 10px;border-radius:11px;box-shadow:none}
+.filters{display:grid;grid-template-columns:repeat(5,1fr);gap:10px}.library{display:grid;grid-template-columns:minmax(0,1fr) 380px;gap:18px;align-items:start}.table{background:#fff;border:1px solid var(--line);border-radius:18px;overflow:hidden}.row{display:grid;grid-template-columns:42px 82px minmax(220px,1fr) 120px 110px 120px 140px;gap:10px;align-items:center;padding:10px 12px;border-bottom:1px solid var(--line)}.row:last-child{border-bottom:0}.row.header{background:#f9fafb;color:#667085;font-weight:950;font-size:12px}.thumb{width:70px;height:70px;border:1px solid var(--line);border-radius:14px;background:#f7f9fd;overflow:hidden}.muted{font-size:12px;color:var(--muted);line-height:1.4;margin:3px 0 0}.detail{position:sticky;top:22px}.detail-img{height:270px;border:1px solid var(--line);border-radius:18px;background:#fff;overflow:hidden}.info{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}.info div{background:#fff;border:1px solid var(--line);border-radius:13px;padding:10px}.info small{display:block;color:var(--muted);margin-bottom:4px}
+.assets{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:16px}.asset{background:#fff;border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow-sm);padding:12px}.asset-img{height:168px;border:1px solid var(--line);border-radius:15px;background:#f8fafc;overflow:hidden}.asset h4{margin:10px 0 6px}
+.qa{display:grid;grid-template-columns:280px minmax(360px,1fr) 340px;gap:18px;align-items:start}.big{height:330px;border:1px solid var(--line);border-radius:20px;background:#fff;overflow:hidden}.check{display:flex;justify-content:space-between;background:#fff;border:1px solid var(--line);border-radius:14px;padding:11px;margin-bottom:8px}
+.chart-row{display:grid;grid-template-columns:1.25fr .75fr;gap:18px}.chart{height:326px}.chart svg{width:100%;height:255px;display:block}.chart-title{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}.chart-title h4{margin:0}
+.donut{display:grid;grid-template-columns:170px 1fr;gap:14px;align-items:center}.legend{display:grid;gap:8px}.legend div{display:flex;justify-content:space-between;align-items:center;background:#fff;border:1px solid var(--line);border-radius:12px;padding:8px 10px}.dot{width:10px;height:10px;border-radius:50%;display:inline-block;margin-right:6px}.dot.b{background:var(--blue)}.dot.g{background:var(--green)}.dot.o{background:var(--orange)}.dot.p{background:var(--purple)}
+.source-grid,.settings-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}.source-card{background:#fff;border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow-sm);padding:16px}.source-card h4{margin:0 0 8px}.source-card p{font-size:13px;color:var(--muted);line-height:1.55}.pipe{background:#0f172a;color:#dbeafe;border-radius:18px;padding:14px;font-family:ui-monospace,Consolas,monospace;font-size:12px;line-height:1.7;overflow:auto}
+.modal{position:fixed;inset:0;background:rgba(16,24,40,.42);display:none;align-items:center;justify-content:center;z-index:50}.modal.show{display:flex}.dialog{width:min(880px,92vw);background:#fff;border-radius:24px;padding:20px;box-shadow:0 30px 90px rgba(0,0,0,.22)}.dialog-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}.dialog-head h3{margin:0}.close{border:0;background:#f2f4f7;border-radius:12px;padding:8px 10px}
+.toast{position:fixed;right:24px;bottom:24px;background:#101828;color:white;padding:12px 14px;border-radius:14px;box-shadow:var(--shadow);display:none}.toast.show{display:block}
+
+/* QA hard guard: do not allow preview art to replace the whole page or exceed workbench size */
+#qa .qa{align-items:start;}
+#qa .big{height:360px;max-height:42vh;}
+#qa .card{overflow:hidden;}
+#qa .check + .btn{margin-top:8px;}
+#qa .mini-card{margin-bottom:10px;}
+
+@media(max-width:1280px){.hero,.steps,.library,.qa,.chart-row{grid-template-columns:1fr}.detail{position:static}.filters{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:900px){:root{--side:0}.app{grid-template-columns:1fr}.side{display:none}.main{padding:18px}.top{align-items:flex-start;flex-direction:column}.search input{width:100%}.flow,.grid.two,.grid.three,.grid.four,.filters,.source-grid,.settings-grid{grid-template-columns:1fr}.row{grid-template-columns:36px 76px 1fr}.row span:nth-child(n+4),.row button{display:none}}
+</style>
 </head>
-<body data-theme="aurora">
-  <div id="app" class="app-shell">
-    <aside class="sidebar">
-      <div class="brand">
-        <div class="brand-mark">犬</div>
-        <div>
-          <div class="brand-title">表情包工坊</div>
-          <div class="brand-sub">Single Owner Pro · v5</div>
-        </div>
-      </div>
-      <nav id="nav" class="nav"></nav>
-      <div class="owner-card">
-        <div class="owner-avatar">赵</div>
-        <div class="owner-meta">
-          <strong>管理员</strong>
-          <span>Owner 模式</span>
-        </div>
-        <button class="icon-button" title="收起侧栏">‹</button>
-      </div>
-    </aside>
+<body>
+<div class="app">
+<aside class="side">
+  <div class="brand"><div class="logo">表</div><div><h1>表情包制作系统</h1><p>UI First · Prompt · Benchmark</p></div></div>
+  <nav class="nav">
+    <button class="active" data-page="overview"><i>总</i>总览</button>
+    <button data-page="maker"><i>做</i>制作工作台</button>
+    <button data-page="source"><i>词</i>提示词来源</button>
+    <button data-page="library"><i>库</i>表情包库</button>
+    <button data-page="assets"><i>资</i>设计资产</button>
+    <button data-page="qa"><i>质</i>质检审核</button>
+    <button data-page="analytics"><i>数</i>数据表现</button>
+    <button data-page="settings"><i>设</i>系统设置</button>
+  </nav>
+  <div class="side-note"><b>设计原则</b><p>热门样本基准放二级配置；提示词融合不污染主流程。</p></div>
+</aside>
+<main class="main">
+<div class="top"><div class="title"><h2 id="title">总览</h2><p id="sub">先锁 UI，再融合 SKILLS/Prompt/Benchmark，最后做模型四轮提升。</p></div><div class="actions"><div class="search"><input placeholder="搜索场景、风格、角色 DNA、提示词卡片"></div><button class="btn">刷新</button><button class="btn primary" data-jump="maker">新建制作</button></div></div>
 
-    <main class="main">
-      <header class="topbar">
-        <div class="page-heading">
-          <h1 id="pageTitle">总览</h1>
-          <p id="pageSubtitle">今天的生成、质检、导出和平台风险</p>
-        </div>
-        <div class="topbar-actions">
-          <label class="search-box">
-            <span>⌕</span>
-            <input id="globalSearch" placeholder="搜索表情包、任务、平台、失败原因" />
-          </label>
-          <select id="themeSelect" class="theme-select" title="主题切换">
-            <option value="aurora">极光蓝</option>
-            <option value="graphite">石墨灰</option>
-            <option value="sakura">樱花粉</option>
-            <option value="forest">森林绿</option>
-          </select>
-          <button id="dateRange" class="ghost-button">2026-07-01 · 今天</button>
-          <button id="refreshBtn" class="ghost-button">刷新</button>
-          <button id="newTaskBtn" class="primary-button">新建生成</button>
-        </div>
-      </header>
-      <section id="content" class="content"></section>
-    </main>
-  </div>
+<section class="page active" id="overview">
+  <div class="hero"><div class="hero-main"><span class="tag blue">UI First · 非生成演示</span><h3>不上传参考图，也能从内置角色库和热门样本基准生成设计方案。</h3><p>场景和语气支持选择与人工输入；提示词优化、热门样本基准、生成模型都进入二级配置，不再堆在主菜单。</p><div class="flow"><div><b>1 UI</b><span>尺寸/布局</span></div><div><b>2 SKILLS</b><span>表情包专用</span></div><div><b>3 提示词</b><span>清洗转换</span></div><div><b>4 样本基准</b><span>后台参与</span></div><div><b>5 模型四轮</b><span>Provider/质检</span></div></div></div><div class="kpis"><div class="kpi"><small>候选卡片</small><strong>220–260</strong><span class="tag green">受控</span></div><div class="kpi"><small>套图数量</small><strong>人工输入</strong><span class="tag green">已改</span></div><div class="kpi"><small>提示词来源</small><strong>6</strong><span class="tag blue">二级配置</span></div><div class="kpi"><small>热门基准</small><strong>后台化</strong><span class="tag purple">不进菜单</span></div></div></div>
+  <div class="chart-row"><div class="card chart"><div class="chart-title"><h4>高频场景覆盖趋势</h4><span class="tag blue">人类可读</span></div><svg viewBox="0 0 720 250"><line x1="48" y1="206" x2="690" y2="206" stroke="#e4e7ec"/><line x1="48" y1="42" x2="48" y2="206" stroke="#e4e7ec"/><path d="M55 178 C130 150 170 166 235 132 C300 98 344 120 410 86 C492 44 548 88 672 58" fill="none" stroke="#2563eb" stroke-width="6" stroke-linecap="round"/><path d="M55 196 C128 188 182 176 244 164 C318 148 380 136 445 122 C540 104 590 96 672 92" fill="none" stroke="#16a56a" stroke-width="5" stroke-linecap="round"/><g fill="#667085" font-size="12"><text x="48" y="232">收到</text><text x="170" y="232">开会</text><text x="295" y="232">拒绝</text><text x="420" y="232">摸鱼</text><text x="552" y="232">下班</text><text x="648" y="232">沙雕</text></g></svg></div><div class="card chart"><div class="chart-title"><h4>风格占比</h4><span class="tag green">环图</span></div><div class="donut"><svg viewBox="0 0 200 200"><circle cx="100" cy="100" r="70" fill="none" stroke="#eef2f8" stroke-width="34"/><circle cx="100" cy="100" r="70" fill="none" stroke="#2563eb" stroke-width="34" stroke-dasharray="164 440" transform="rotate(-90 100 100)"/><circle cx="100" cy="100" r="70" fill="none" stroke="#16a56a" stroke-width="34" stroke-dasharray="105 440" stroke-dashoffset="-164" transform="rotate(-90 100 100)"/><circle cx="100" cy="100" r="70" fill="none" stroke="#f59e0b" stroke-width="34" stroke-dasharray="78 440" stroke-dashoffset="-269" transform="rotate(-90 100 100)"/><text x="77" y="106" font-size="28" font-weight="900">98%</text><text x="67" y="130" fill="#667085" font-size="12">目标验收</text></svg><div class="legend"><div><span><i class="dot b"></i>3D 软胶</span><b>37%</b></div><div><span><i class="dot g"></i>手绘/厚涂</span><b>24%</b></div><div><span><i class="dot o"></i>聊天截图</span><b>18%</b></div><div><span><i class="dot p"></i>动图</span><b>21%</b></div></div></div></div></div>
+</section>
 
-  <div id="drawer" class="drawer" aria-hidden="true"></div>
-  <div id="modal" class="modal-layer" aria-hidden="true"></div>
-  <div id="toast" class="toast-stack"></div>
+<section class="page" id="maker">
+  <div class="step-tabs"><button class="active">1 需求</button><button>2 上传/DNA</button><button>3 提示词</button><button>4 候选</button><button>5 质检导出</button></div>
+  <div class="steps"><div class="card"><div class="head"><div><h3>需求输入</h3><p>场景和语气既可选择，也可人工输入。</p></div></div><div class="field"><label>常用场景</label><div class="chips" id="sceneChips"></div></div><div class="field"><label>自定义场景</label><input id="customScene" placeholder="例如：老板突然拉会、朋友已读不回、客户疯狂催稿"></div><div class="field"><label>常用语气</label><div class="chips" id="toneChips"></div></div><div class="field"><label>自定义语气</label><input id="customTone" placeholder="例如：冷脸卖萌、假装体面、阴阳但礼貌"></div><div class="field"><label>套图数量</label><input type="number" value="24" min="1" max="80"></div><button class="btn primary" id="build">构建深度提示词</button></div>
+  <div class="card"><div class="head"><div><h3>上传与角色 DNA</h3><p>不上传也能从内置角色库 + 热门样本基准生成 DNA。</p></div></div><div class="upload"><b>上传参考图 / GIF / 多图</b><span>可选。上传后用于主体避让、一图多版和角色一致性。</span></div><div class="mini"><div><b>内置 DNA</b><span>不上传时自动生成。</span></div><div><b>热门基准</b><span>后台参与，不进主菜单。</span></div><div><b>动态计划</b><span>动作、节奏、循环方式。</span></div></div></div>
+  <div class="card"><div class="head"><div><h3>外部配置入口</h3><p>模型、提示词来源、热门样本基准都从这里进入。</p></div></div><button class="btn soft" data-open-settings="model">配置图片模型</button><button class="btn soft" data-open-settings="prompt" style="margin-top:10px">配置提示词来源</button><button class="btn soft" data-open-settings="benchmark" style="margin-top:10px">导入热门样本</button></div></div>
+  <div class="grid two" style="margin-top:18px"><div class="card"><div class="head"><div><h3>生成摘要</h3><p>不展示六源融合过程，只展示表情包生产摘要。</p></div></div><div class="layer"><b>场景与语气</b><span id="intent">开会场景；打工人语气；礼貌崩溃但仍能回复。</span></div><div class="layer"><b>角色一致性</b><span id="dna">统一脸型、配色、白边、道具；每张变化动作和文案。</span></div><div class="layer"><b>质量要求</b><span id="prod">非扁平、光影材质、边缘描边、道具、可读短文案、主体避让。</span></div></div><div class="card"><div class="head"><div><h3>候选结果</h3><p>尺寸受控。未配置正式模型时不会显示正式候选。</p></div><button class="btn primary" id="simulate">模拟参考图再创作</button></div><div class="candidate-grid" id="candidates"></div></div></div>
+</section>
 
-  <script src="./app.js"></script>
+<section class="page" id="source"><div class="source-grid"><div class="source-card"><h4>prompts.chat</h4><p>读取公开格式，去重、过滤、转成表情包专用提示词卡。</p><span class="tag blue">后台配置</span></div><div class="source-card"><h4>GitHub 提示词仓库</h4><p>只作为来源候选，必须检查许可、去重、过滤低质内容。</p><span class="tag orange">需验收</span></div><div class="source-card"><h4>系统提示词结构库</h4><p>只抽取循环、验收、结构化输出，不展示原文。</p><span class="tag green">只抽结构</span></div><div class="source-card"><h4>项目内规则</h4><p>读取项目已有规则，合并到表情包专用库。</p></div><div class="source-card"><h4>微信套图策略</h4><p>角色 DNA、16/24 套图、微信尺寸、封面和图标。</p></div><div class="source-card"><h4>表情制作策略</h4><p>多图上传、中文文案、语气、风格、一图多版、主体避让。</p></div></div><div class="card" style="margin-top:18px"><div class="head"><div><h3>后台处理管线</h3><p>外部来源后台化，不污染制作主流程。</p></div></div><div class="pipe">拉取/导入 → 许可检查 → 去重 → 低质过滤 → 场景/风格/机制分类 → 转表情包专用提示词卡 → 质检规则绑定 → 页面只展示中文摘要</div></div></section>
+
+<section class="page" id="library"><div class="card"><div class="head"><div><h3>表情包库</h3><p>资源管理，不是大图画廊。</p></div><button class="btn danger">批量删除</button></div><div class="filters"><div class="field"><label>场景</label><select><option>全部</option></select></div><div class="field"><label>风格</label><select><option>全部</option></select></div><div class="field"><label>来源</label><select><option>全部</option></select></div><div class="field"><label>质量</label><select><option>全部</option></select></div><div class="field"><label>动态</label><select><option>全部</option></select></div></div></div><div class="library" style="margin-top:18px"><div class="card compact"><div class="table"><div class="row header"><span></span><span>图</span><span>名称</span><span>来源</span><span>质量</span><span>平台</span><span>操作</span></div><div class="row"><input type="checkbox"><div class="thumb" id="lib1"></div><div><b>开会礼貌崩溃 01</b><p class="muted">场景：开会 · 语气：打工人</p></div><span>参考图再创作</span><span class="tag orange">需复核</span><span>微信</span><button class="btn soft">详情</button></div></div></div><div class="card detail"><div class="head"><div><h3>详情</h3><p>大图只在详情区展示。</p></div></div><div class="detail-img" id="detail"></div><div class="info"><div><small>质量</small><b>需人工复核</b></div><div><small>来源</small><b>参考图再创作</b></div><div><small>发布校验</small><b>待检查</b></div><div><small>动态</small><b>否</b></div></div></div></div></section>
+
+<section class="page" id="assets"><div class="card"><div class="head"><div><h3>设计资产</h3><p>卡片尺寸受控，不再大图铺满。</p></div></div><div class="asset-grid assets"><div class="asset"><div class="asset-img" id="asset1"></div><h4>会议犬 DNA</h4><span class="tag blue">一致性锁定</span></div><div class="asset"><div class="asset-img" id="asset2"></div><h4>3D 软胶风格板</h4><span class="tag green">可用于生成</span></div><div class="asset"><div class="asset-img" id="asset3"></div><h4>打工人 24 张模板</h4><span class="tag purple">套图模板</span></div></div></div></section>
+
+<section class="page" id="qa"><div class="qa"><div class="card"><h3>质检队列</h3><p>低质样本默认不能通过。</p><div class="mini-card"><b>扁平化风险</b><span>统一圆脸、低细节、缺少场景。</span></div><div class="mini-card"><b>动态检查</b><span>帧数、循环、动作差异。</span></div></div><div class="card"><div class="head"><div><h3>预览区</h3><p>固定高度预览，不允许图片撑满全屏。</p></div><span class="tag orange">需复核</span></div><div class="big" id="qaArt"></div></div><div class="card"><h3>检查清单</h3><div class="check"><b>非扁平化</b><span class="tag orange">需复核</span></div><div class="check"><b>主体避让</b><span class="tag green">通过</span></div><div class="check"><b>动态感</b><span class="tag blue">待检查</span></div><button class="btn green">单个通过</button><button class="btn danger">驳回</button></div></div></section>
+
+<section class="page" id="analytics"><div class="chart-row"><div class="card chart"><div class="chart-title"><h4>热门场景覆盖</h4><span class="tag blue">趋势</span></div><svg viewBox="0 0 720 250"><line x1="48" y1="206" x2="690" y2="206" stroke="#e4e7ec"/><path d="M55 178 C130 150 170 166 235 132 C300 98 344 120 410 86 C492 44 548 88 672 58" fill="none" stroke="#2563eb" stroke-width="6" stroke-linecap="round"/></svg></div><div class="card chart"><div class="chart-title"><h4>传播机制排行</h4><span class="tag purple">排行</span></div><svg viewBox="0 0 500 250"><g font-size="13" fill="#667085"><text x="20" y="40">共鸣</text><text x="20" y="85">反差</text><text x="20" y="130">低成本回复</text><text x="20" y="175">群聊刷屏</text><text x="20" y="220">文案梗</text></g><rect x="130" y="24" width="300" height="18" rx="9" fill="#2563eb"/><rect x="130" y="69" width="250" height="18" rx="9" fill="#12a66a"/><rect x="130" y="114" width="218" height="18" rx="9" fill="#f59e0b"/></svg></div></div></section>
+
+<section class="page" id="settings"><div class="settings-grid"><div class="card" id="setting-model"><h3>正式图片模型</h3><p>配置 URL、密钥、模型、测试连接。未配置不能假生成。</p><button class="btn primary" onclick="toast('已打开图片模型配置面板')">配置</button></div><div class="card" id="setting-prompt"><h3>提示词来源</h3><p>prompts.chat、GitHub 仓库、系统结构库、项目规则、微信/制作策略。</p><button class="btn soft" onclick="toast('已打开提示词来源配置')">刷新来源</button></div><div class="card" id="setting-benchmark"><h3>热门样本基准</h3><p>仅后台配置和导入，不放主菜单。</p><button class="btn soft" onclick="toast('已打开热门样本导入')">导入样本包</button></div></div></section>
+</main></div>
+<div class="toast" id="toast"></div>
+<script>
+const titles={overview:["总览","先锁 UI，再融合 SKILLS/Prompt/Benchmark，最后做模型四轮提升。"],maker:["制作工作台","不上传参考图也能从内置 DNA 与热门基准生成设计方案。"],source:["提示词来源","外部来源后台化：清洗、去重、过滤、转成表情包专用结构。"],library:["表情包库","紧凑资源管理，不是大图画廊。"],assets:["设计资产","Character DNA、风格板、参考模板，卡片尺寸受控。"],qa:["质检审核","不是单图占满屏，而是队列、预览、检查清单三栏。"],analytics:["数据表现","图表按人类可读的趋势和排行组织。"],settings:["系统设置","模型、提示词来源、热门样本基准都放二级配置。"]};
+function show(p){document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));document.getElementById(p).classList.add('active');document.querySelectorAll('[data-page]').forEach(b=>b.classList.toggle('active',b.dataset.page===p));document.getElementById('title').textContent=titles[p][0];document.getElementById('sub').textContent=titles[p][1];window.scrollTo({top:0,behavior:'smooth'});}
+document.querySelectorAll('[data-page],[data-jump]').forEach(b=>b.onclick=()=>show(b.dataset.page||b.dataset.jump));
+document.querySelectorAll('[data-open-settings]').forEach(b=>b.onclick=()=>{show('settings');setTimeout(()=>document.getElementById('setting-'+b.dataset.openSettings).scrollIntoView({behavior:'smooth',block:'center'}),80)});
+function toast(t){const el=document.getElementById('toast');el.textContent=t;el.classList.add('show');setTimeout(()=>el.classList.remove('show'),1600);}
+function chips(id,arr){const box=document.getElementById(id);arr.forEach((x,i)=>{const b=document.createElement('button');b.className='chip'+(i===0?' active':'');b.textContent=x;b.onclick=()=>{box.querySelectorAll('.chip').forEach(c=>c.classList.remove('active'));b.classList.add('active')};box.appendChild(b)})}
+chips('sceneChips',['收到','拒绝','催促','感谢','抱歉','摸鱼','开会','下班','崩溃','加油','阴阳怪气','沙雕','治愈','发疯','晚安','催更','别吵','我裂开']);
+chips('toneChips',['打工人','沙雕','阴阳怪气','可爱','冷幽默','治愈','发疯文学','反差萌','礼貌崩溃','嘴硬心软','冷脸卖萌']);
+function art(seed,text='收到'){const c=[['#dbeafe','#fff2cc','#ffb4c2'],['#e8f9ef','#ffe7c2','#a7d8ff'],['#f4e8ff','#ffedda','#c8facc']][seed%3];return `<svg viewBox="0 0 420 320"><defs><linearGradient id="g${seed}" x1="0" x2="1" y1="0" y2="1"><stop stop-color="${c[0]}"/><stop offset=".6" stop-color="${c[1]}"/><stop offset="1" stop-color="${c[2]}"/></linearGradient><filter id="s${seed}"><feDropShadow dx="0" dy="12" stdDeviation="10" flood-color="#475467" flood-opacity=".22"/></filter></defs><rect width="420" height="320" rx="34" fill="url(#g${seed})"/><ellipse cx="210" cy="238" rx="98" ry="20" fill="#475467" opacity=".15"/><g filter="url(#s${seed})"><path d="M142 154 C142 88 198 52 252 76 C308 102 314 176 272 218 C230 258 162 226 142 154Z" fill="#fff" stroke="#fff" stroke-width="18"/><path d="M154 151 C154 96 198 68 238 84 C282 102 290 166 254 202 C218 236 166 216 154 151Z" fill="${seed%2?'#ffd78a':'#f5b86f'}"/><circle cx="192" cy="146" r="8" fill="#101828"/><circle cx="244" cy="146" r="8" fill="#101828"/><path d="M204 178 C220 190 238 187 250 175" fill="none" stroke="#6b2c1f" stroke-width="6" stroke-linecap="round"/><rect x="270" y="150" width="70" height="42" rx="15" fill="#fff" stroke="#263348" stroke-width="4"/><text x="287" y="178" font-size="20" font-weight="900" fill="#263348">${text}</text></g></svg>`}
+['lib1','detail','asset1','asset2','asset3','qaArt'].forEach((id,i)=>{const el=document.getElementById(id);if(el)el.innerHTML=art(i,i%2?'别催':'收到')});
+document.getElementById('simulate').onclick=()=>{const g=document.getElementById('candidates');g.innerHTML='';['收到但快崩溃','别催我在处理','开会中假装冷静','下班前最后一次','谢谢我先裂开','已读但不想回'].forEach((n,i)=>{const c=document.createElement('div');c.className='candidate';c.innerHTML=`<div class="art">${art(i,i%2?'别催':'收到')}</div><h4>${n}</h4><span class="tag orange">需复核</span> <span class="tag blue">参考图再创作</span><div class="tools"><button class="btn soft" onclick="toast('打开详情')">详情</button><button class="btn primary" onclick="toast('已加入候选池')">加入候选</button></div>`;g.appendChild(c)});};
+document.getElementById('build').onclick=()=>{const scene=document.querySelector('#sceneChips .chip.active')?.textContent||'开会';const tone=document.querySelector('#toneChips .chip.active')?.textContent||'打工人';const customScene=document.getElementById('customScene').value.trim();const customTone=document.getElementById('customTone').value.trim();document.getElementById('intent').textContent=`场景：${customScene||scene}；语气：${customTone||tone}；用途：低成本聊天回复；套图数量按人工输入。`;document.getElementById('dna').textContent='不上传时从内置角色库 + 热门基准生成 DNA；上传后锁定参考图角色一致性。';document.getElementById('prod').textContent='非扁平、光影材质、边缘描边、道具、可读短文案、主体避让、动态计划。';toast('已更新生成摘要')};
+</script>
 </body>
 </html>
